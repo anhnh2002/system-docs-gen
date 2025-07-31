@@ -1,0 +1,200 @@
+/* Copyright (c) Meta Platforms, Inc. and affiliates */
+/* Main layout styles */
+body {
+    overflow-x: hidden;
+}
+
+.sidebar {
+    transition: width 0.3s ease;
+    box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+}
+
+/* Header logo styles */
+.header-logo {
+    max-height: 30px;
+    margin-right: 10px;
+}
+
+/* Transition for main content when sidebar changes */
+.main-content-transition {
+    transition: all 0.3s ease;
+}
+
+/* Status visualizer styles */
+.agent-box {
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    padding: 10px;
+    margin-bottom: 10px;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.agent-box.active {
+    border-color: #198754;
+    box-shadow: 0 0 5px rgba(25, 135, 84, 0.5);
+    background-color: rgba(25, 135, 84, 0.1);
+}
+
+.agent-box h3 {
+    margin-top: 5px;
+    font-size: 1.2rem;
+}
+
+.component-info {
+    margin-top: 20px;
+    padding: 10px;
+    background-color: #f8f9fa;
+    border-radius: 5px;
+    border-left: 3px solid #007bff;
+}
+
+/* Agent workflow visualization styles */
+#agent-workflow {
+    min-height: 200px;
+}
+
+.workflow-node circle {
+    fill: #ffffff;  /* White background by default */
+    stroke: #6c757d;
+    stroke-width: 1.5px;
+    transition: all 0.3s ease;
+}
+
+.workflow-node.active circle {
+    fill: #198754;  /* Green background when active */
+    stroke: #0d6efd;
+    stroke-width: 2px;
+}
+
+.workflow-link {
+    stroke: #adb5bd;
+    stroke-width: 2px;
+    fill: none;
+    marker-end: url(#arrowhead);
+}
+
+.workflow-label {
+    font-size: 12px;
+    text-anchor: middle;
+    dominant-baseline: middle;
+    fill: #212529;
+    pointer-events: none;
+    transition: all 0.3s ease;
+}
+
+.workflow-node.active .workflow-label {
+    fill: #fff;
+    font-weight: bold;
+}
+
+.workflow-text-label {
+    font-size: 14px;
+    text-anchor: middle;
+    dominant-baseline: middle;
+    fill: #666;
+    font-weight: bold;
+}
+
+/* Repository structure styles */
+.repo-node {
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.repo-node:hover {
+    filter: brightness(0.9);
+}
+
+.repo-node-label {
+    font-size: 0.9rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.repo-node-complete {
+    fill: #198754;  /* Green */
+}
+
+.repo-node-in-progress {
+    fill: #ffc107;  /* Yellow */
+}
+
+.repo-node-not-started {
+    fill: #f8f9fa;  /* Light grey */
+}
+
+.repo-node-focus {
+    stroke: #dc3545;  /* Red */
+    stroke-width: 2;
+}
+
+/* Log container styles */
+#log-container {
+    font-family: monospace;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    background-color: #212529;
+    color: #f8f9fa;
+    border-radius: 5px;
+    height: 250px;
+    max-height: 250px;
+}
+
+.log-line {
+    margin-bottom: 2px;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.log-info {
+    color: #f8f9fa;
+}
+
+.log-warning {
+    color: #ffc107;
+}
+
+.log-error {
+    color: #dc3545;
+}
+
+.log-debug {
+    color: #6c757d;
+}
+
+/* Completeness table styles */
+.completeness-table {
+    font-size: 0.9rem;
+}
+
+.progress-cell {
+    width: 100px;
+}
+
+.progress-bar-mini {
+    height: 10px;
+    margin-top: 5px;
+    border-radius: 5px;
+}
+
+/* Animation for focus transitions */
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.05);
+        opacity: 0.8;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.highlight-focus {
+    animation: pulse 1s;
+} 

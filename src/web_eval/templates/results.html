@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DocAgent - Evaluation Results</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container-fluid my-3">
+        <div class="row mb-3">
+            <div class="col-12">
+                <div class="card shadow">
+                    <div class="bg-dark text-white p-3 d-flex justify-content-between align-items-center">
+                        <h2 class="mb-0">DocAgent - Evaluation Results</h2>
+                        <div>
+                            <button id="refreshBtn" class="btn btn-light me-2">
+                                <span id="refreshSpinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                                Refresh Evaluation
+                            </button>
+                            <a href="{{ url_for('index') }}" class="btn btn-outline-light">Return to Config</a>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info">
+                            <h5>Repository: {{ results.directory }}</h5>
+                            <div class="row mt-3">
+                                <div class="col-md-3">
+                                    <strong>Total Files:</strong> {{ results.statistics.total_files }}
+                                </div>
+                                <div class="col-md-3">
+                                    <strong>Total Classes:</strong> {{ results.statistics.total_classes }}
+                                </div>
+                                <div class="col-md-3">
+                                    <strong>Total Functions/Methods:</strong> {{ results.statistics.total_functions }}
+                                </div>
+                                <div class="col-md-3">
+                                    <strong>Overall Score:</strong> 
+                                    <span class="badge {{ 'bg-success' if results.statistics.overall_average_score >= 0.8 else 'bg-warning' if results.statistics.overall_average_score >= 0.5 else 'bg-danger' }}">
+                                        {{ '%.2f'|format(results.statistics.overall_average_score) }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Classes Section -->
+                        <h4 class="mt-4 mb-3">Classes</h4>
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>Class Name</th>
+                                        <th>Score</th>
+                                        <th>Summary</th>
+                                        <th>Description</th>
+                                        <th>Parameters</th>
+                                        <th>Attributes</th>
+                                        <th>Examples</th>
+                                        <th>File</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for class in results.classes %}
+                                    <tr>
+                                        <td>{{ class.name }}</td>
+                                        <td>
+                                            <span class="badge {{ 'bg-success' if class.completeness_score >= 0.8 else 'bg-warning' if class.completeness_score >= 0.5 else 'bg-danger' }}">
+                                                {{ '%.2f'|format(class.completeness_score) }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            {% if class.completeness_elements.summary %}
+                                                <span class="text-success">✓</span>
+                                                {% if class.element_required.summary %}
+                                                    <button class="btn btn-sm btn-outline-primary evaluate-btn ms-2" 
+                                                            data-component-type="class"
+                                                            data-component-name="{{ class.name }}"
+                                                            data-docstring-part="summary"
+                                                            data-signature="{{ class.signature }}"
+                                                            data-docstring-content="{{ class.docstring|extract_component('summary') }}">
+                                                        {% if class.helpfulness_scores and class.helpfulness_scores.summary %}
+                                                            <span class="badge bg-info">{{ class.helpfulness_scores.summary.score }}/5</span>
+                                                        {% else %}
+                                                            Evaluate
+                                                        {% endif %}
+                                                    </button>
+                                                {% endif %}
+                                            {% else %}
+                                                <span class="text-danger">✗</span>
+                                                {% if class.element_required.summary %}
+                                                    <span class="badge bg-warning">Required</span>
+                                                {% endif %}
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if class.completeness_elements.description %}
+                                                <span class="text-success">✓</span>
+                                                {% if class.element_required.description %}
+                                                    <button class="btn btn-sm btn-outline-primary evaluate-btn ms-2" 
+                                                            data-component-type="class"
+                                                            data-component-name="{{ class.name }}"
+                                                            data-docstring-part="description"
+                                                            data-signature="{{ class.signature }}"
+                                                            data-docstring-content="{{ class.docstring|extract_component('description') }}">
+                                                        {% if class.helpfulness_scores and class.helpfulness_scores.description %}
+                                                            <span class="badge bg-info">{{ class.helpfulness_scores.description.score }}/5</span>
+                                                        {% else %}
+                                                            Evaluate
+                                                        {% endif %}
+                                                    </button>
+                                                {% endif %}
+                                            {% else %}
+                                                <span class="text-danger">✗</span>
+                                                {% if class.element_required.description %}
+                                                    <span class="badge bg-warning">Required</span>
+                                                {% endif %}
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if class.completeness_elements.parameters %}
+                                                <span class="text-success">✓</span>
+                                                {% if class.element_required.parameters %}
+                                                    <button class="btn btn-sm btn-outline-primary evaluate-btn ms-2" 
+                                                            data-component-type="class"
+                                                            data-component-name="{{ class.name }}"
+                                                            data-docstring-part="parameters"
+                                                            data-signature="{{ class.signature }}"
+                                                            data-docstring-content="{{ class.docstring|extract_component('parameters') }}">
+                                                        {% if class.helpfulness_scores and class.helpfulness_scores.parameters %}
+                                                            <span class="badge bg-info">{{ class.helpfulness_scores.parameters.score }}/5</span>
+                                                        {% else %}
+                                                            Evaluate
+                                                        {% endif %}
+                                                    </button>
+                                                {% endif %}
+                                            {% else %}
+                                                <span class="text-danger">✗</span>
+                                                {% if class.element_required.parameters %}
+                                                    <span class="badge bg-warning">Required</span>
+                                                {% endif %}
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if class.completeness_elements.attributes %}
+                                                <span class="text-success">✓</span>
+                                                {% if class.element_required.attributes %}
+                                                    <button class="btn btn-sm btn-outline-primary evaluate-btn ms-2" 
+                                                            data-component-type="class"
+                                                            data-component-name="{{ class.name }}"
+                                                            data-docstring-part="attributes"
+                                                            data-signature="{{ class.signature }}"
+                                                            data-docstring-content="{{ class.docstring|extract_component('attributes') }}">
+                                                        {% if class.helpfulness_scores and class.helpfulness_scores.attributes %}
+                                                            <span class="badge bg-info">{{ class.helpfulness_scores.attributes.score }}/5</span>
+                                                        {% else %}
+                                                            Evaluate
+                                                        {% endif %}
+                                                    </button>
+                                                {% endif %}
+                                            {% else %}
+                                                <span class="text-danger">✗</span>
+                                                {% if class.element_required.attributes %}
+                                                    <span class="badge bg-warning">Required</span>
+                                                {% endif %}
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if class.completeness_elements.examples %}
+                                                <span class="text-success">✓</span>
+                                                {% if class.element_required.examples %}
+                                                    <button class="btn btn-sm btn-outline-primary evaluate-btn ms-2" 
+                                                            data-component-type="class"
+                                                            data-component-name="{{ class.name }}"
+                                                            data-docstring-part="examples"
+                                                            data-signature="{{ class.signature }}"
+                                                            data-docstring-content="{{ class.docstring|extract_component('examples') }}">
+                                                        {% if class.helpfulness_scores and class.helpfulness_scores.examples %}
+                                                            <span class="badge bg-info">{{ class.helpfulness_scores.examples.score }}/5</span>
+                                                        {% else %}
+                                                            Evaluate
+                                                        {% endif %}
+                                                    </button>
+                                                {% endif %}
+                                            {% else %}
+                                                <span class="text-danger">✗</span>
+                                                {% if class.element_required.examples %}
+                                                    <span class="badge bg-warning">Required</span>
+                                                {% endif %}
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ class.file.split('/')[-1] }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Functions/Methods Section -->
+                        <h4 class="mt-5 mb-3">Functions/Methods</h4>
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>Function Name</th>
+                                        <th>Type</th>
+                                        <th>Score</th>
+                                        <th>Summary</th>
+                                        <th>Description</th>
+                                        <th>Returns</th>
+                                        <th>Raises</th>
+                                        <th>Examples</th>
+                                        <th>File</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for func in results.functions %}
+                                    <tr>
+                                        <td>{{ func.name }}</td>
+                                        <td>{{ func.type }}</td>
+                                        <td>
+                                            <span class="badge {{ 'bg-success' if func.completeness_score >= 0.8 else 'bg-warning' if func.completeness_score >= 0.5 else 'bg-danger' }}">
+                                                {{ '%.2f'|format(func.completeness_score) }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            {% if func.completeness_elements.summary %}
+                                                <span class="text-success">✓</span>
+                                                {% if func.element_required.summary %}
+                                                    <button class="btn btn-sm btn-outline-primary evaluate-btn ms-2" 
+                                                            data-component-type="function"
+                                                            data-component-name="{{ func.name }}"
+                                                            data-docstring-part="summary"
+                                                            data-signature="{{ func.signature }}"
+                                                            data-docstring-content="{{ func.docstring|extract_component('summary') }}">
+                                                        {% if func.helpfulness_scores and func.helpfulness_scores.summary %}
+                                                            <span class="badge bg-info">{{ func.helpfulness_scores.summary.score }}/5</span>
+                                                        {% else %}
+                                                            Evaluate
+                                                        {% endif %}
+                                                    </button>
+                                                {% endif %}
+                                            {% else %}
+                                                <span class="text-danger">✗</span>
+                                                {% if func.element_required.summary %}
+                                                    <span class="badge bg-warning">Required</span>
+                                                {% endif %}
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if func.completeness_elements.description %}
+                                                <span class="text-success">✓</span>
+                                                {% if func.element_required.description %}
+                                                    <button class="btn btn-sm btn-outline-primary evaluate-btn ms-2" 
+                                                            data-component-type="function"
+                                                            data-component-name="{{ func.name }}"
+                                                            data-docstring-part="description"
+                                                            data-signature="{{ func.signature }}"
+                                                            data-docstring-content="{{ func.docstring|extract_component('description') }}">
+                                                        {% if func.helpfulness_scores and func.helpfulness_scores.description %}
+                                                            <span class="badge bg-info">{{ func.helpfulness_scores.description.score }}/5</span>
+                                                        {% else %}
+                                                            Evaluate
+                                                        {% endif %}
+                                                    </button>
+                                                {% endif %}
+                                            {% else %}
+                                                <span class="text-danger">✗</span>
+                                                {% if func.element_required.description %}
+                                                    <span class="badge bg-warning">Required</span>
+                                                {% endif %}
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if func.completeness_elements.returns %}
+                                                <span class="text-success">✓</span>
+                                                {% if func.element_required.returns %}
+                                                    <button class="btn btn-sm btn-outline-primary evaluate-btn ms-2" 
+                                                            data-component-type="function"
+                                                            data-component-name="{{ func.name }}"
+                                                            data-docstring-part="returns"
+                                                            data-signature="{{ func.signature }}"
+                                                            data-docstring-content="{{ func.docstring|extract_component('returns') }}">
+                                                        {% if func.helpfulness_scores and func.helpfulness_scores.returns %}
+                                                            <span class="badge bg-info">{{ func.helpfulness_scores.returns.score }}/5</span>
+                                                        {% else %}
+                                                            Evaluate
+                                                        {% endif %}
+                                                    </button>
+                                                {% endif %}
+                                            {% else %}
+                                                <span class="text-danger">✗</span>
+                                                {% if func.element_required.returns %}
+                                                    <span class="badge bg-warning">Required</span>
+                                                {% endif %}
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if func.completeness_elements.raises %}
+                                                <span class="text-success">✓</span>
+                                                {% if func.element_required.raises %}
+                                                    <button class="btn btn-sm btn-outline-primary evaluate-btn ms-2" 
+                                                            data-component-type="function"
+                                                            data-component-name="{{ func.name }}"
+                                                            data-docstring-part="raises"
+                                                            data-signature="{{ func.signature }}"
+                                                            data-docstring-content="{{ func.docstring|extract_component('raises') }}">
+                                                        {% if func.helpfulness_scores and func.helpfulness_scores.raises %}
+                                                            <span class="badge bg-info">{{ func.helpfulness_scores.raises.score }}/5</span>
+                                                        {% else %}
+                                                            Evaluate
+                                                        {% endif %}
+                                                    </button>
+                                                {% endif %}
+                                            {% else %}
+                                                <span class="text-danger">✗</span>
+                                                {% if func.element_required.raises %}
+                                                    <span class="badge bg-warning">Required</span>
+                                                {% endif %}
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if func.completeness_elements.examples %}
+                                                <span class="text-success">✓</span>
+                                                {% if func.element_required.examples %}
+                                                    <button class="btn btn-sm btn-outline-primary evaluate-btn ms-2" 
+                                                            data-component-type="function"
+                                                            data-component-name="{{ func.name }}"
+                                                            data-docstring-part="examples"
+                                                            data-signature="{{ func.signature }}"
+                                                            data-docstring-content="{{ func.docstring|extract_component('examples') }}">
+                                                        {% if func.helpfulness_scores and func.helpfulness_scores.examples %}
+                                                            <span class="badge bg-info">{{ func.helpfulness_scores.examples.score }}/5</span>
+                                                        {% else %}
+                                                            Evaluate
+                                                        {% endif %}
+                                                    </button>
+                                                {% endif %}
+                                            {% else %}
+                                                <span class="text-danger">✗</span>
+                                                {% if func.element_required.examples %}
+                                                    <span class="badge bg-warning">Required</span>
+                                                {% endif %}
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ func.file.split('/')[-1] }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Evaluation Modal -->
+    <div class="modal fade" id="evaluationModal" tabindex="-1" aria-labelledby="evaluationModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="evaluationModalLabel">Evaluating Helpfulness</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <p><strong>Component:</strong> <span id="componentName"></span></p>
+                        <p><strong>Part:</strong> <span id="docstringPart"></span></p>
+                        <p><strong>Content:</strong></p>
+                        <pre id="docstringContent" class="p-3 bg-light rounded"></pre>
+                    </div>
+                    <div id="evaluationResult" class="d-none">
+                        <div class="alert alert-info">
+                            <h5 class="mb-3">Evaluation Result: <span id="evaluationScore" class="badge bg-info"></span></h5>
+                            <p><strong>Explanation:</strong></p>
+                            <p id="evaluationExplanation"></p>
+                        </div>
+                    </div>
+                    <div id="evaluationLoading" class="text-center d-none">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2">Evaluating helpfulness with LLM... This may take a minute.</p>
+                    </div>
+                    <div id="evaluationError" class="alert alert-danger d-none"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" id="startEvaluationBtn" class="btn btn-primary">
+                        <span id="evaluationBtnSpinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                        Evaluate
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize modal
+            const evaluationModal = new bootstrap.Modal(document.getElementById('evaluationModal'));
+            
+            // Event listener for evaluate buttons
+            document.querySelectorAll('.evaluate-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    // Get data attributes
+                    const componentType = this.getAttribute('data-component-type');
+                    const componentName = this.getAttribute('data-component-name');
+                    const docstringPart = this.getAttribute('data-docstring-part');
+                    const signature = this.getAttribute('data-signature');
+                    const docstringContent = this.getAttribute('data-docstring-content');
+                    
+                    // Set modal content
+                    document.getElementById('componentName').textContent = componentName;
+                    document.getElementById('docstringPart').textContent = docstringPart;
+                    document.getElementById('docstringContent').textContent = docstringContent;
+                    
+                    // Store data for evaluation
+                    document.getElementById('startEvaluationBtn').setAttribute('data-component-type', componentType);
+                    document.getElementById('startEvaluationBtn').setAttribute('data-component-name', componentName);
+                    document.getElementById('startEvaluationBtn').setAttribute('data-docstring-part', docstringPart);
+                    document.getElementById('startEvaluationBtn').setAttribute('data-signature', signature);
+                    document.getElementById('startEvaluationBtn').setAttribute('data-docstring-content', docstringContent);
+                    
+                    // Reset UI elements
+                    document.getElementById('evaluationResult').classList.add('d-none');
+                    document.getElementById('evaluationLoading').classList.add('d-none');
+                    document.getElementById('evaluationError').classList.add('d-none');
+                    document.getElementById('startEvaluationBtn').classList.remove('d-none');
+                    
+                    // Check if already evaluated
+                    if (this.querySelector('.badge')) {
+                        // If already evaluated, show result
+                        const score = this.querySelector('.badge').textContent.split('/')[0];
+                        document.getElementById('evaluationScore').textContent = score + '/5';
+                        document.getElementById('evaluationResult').classList.remove('d-none');
+                        document.getElementById('startEvaluationBtn').classList.add('d-none');
+                    }
+                    
+                    // Show modal
+                    evaluationModal.show();
+                });
+            });
+            
+            // Event listener for evaluation button in modal
+            document.getElementById('startEvaluationBtn').addEventListener('click', function() {
+                const evaluationBtn = this;
+                const spinner = document.getElementById('evaluationBtnSpinner');
+                const loadingDiv = document.getElementById('evaluationLoading');
+                const resultDiv = document.getElementById('evaluationResult');
+                const errorDiv = document.getElementById('evaluationError');
+                
+                // Get data attributes
+                const componentType = this.getAttribute('data-component-type');
+                const componentName = this.getAttribute('data-component-name');
+                const docstringPart = this.getAttribute('data-docstring-part');
+                const signature = this.getAttribute('data-signature');
+                const docstringContent = this.getAttribute('data-docstring-content');
+                
+                // Show loading UI
+                spinner.classList.remove('d-none');
+                evaluationBtn.disabled = true;
+                loadingDiv.classList.remove('d-none');
+                resultDiv.classList.add('d-none');
+                errorDiv.classList.add('d-none');
+                
+                // Send request to evaluate helpfulness
+                fetch('/evaluate_helpfulness', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        component_type: componentType,
+                        component_name: componentName,
+                        docstring_part: docstringPart,
+                        signature: signature,
+                        docstring_content: docstringContent
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Update UI with result
+                        document.getElementById('evaluationScore').textContent = data.score + '/5';
+                        document.getElementById('evaluationExplanation').textContent = data.explanation;
+                        resultDiv.classList.remove('d-none');
+                        
+                        // Update button in table
+                        document.querySelector(`.evaluate-btn[data-component-type="${componentType}"][data-component-name="${componentName}"][data-docstring-part="${docstringPart}"]`)
+                            .innerHTML = `<span class="badge bg-info">${data.score}/5</span>`;
+                    } else {
+                        // Show error
+                        errorDiv.textContent = 'Error: ' + data.error;
+                        errorDiv.classList.remove('d-none');
+                    }
+                })
+                .catch(error => {
+                    // Show error
+                    errorDiv.textContent = 'Error: ' + error.message;
+                    errorDiv.classList.remove('d-none');
+                })
+                .finally(() => {
+                    // Hide loading UI
+                    spinner.classList.add('d-none');
+                    evaluationBtn.disabled = false;
+                    loadingDiv.classList.add('d-none');
+                });
+            });
+            
+            // Refresh button
+            document.getElementById('refreshBtn').addEventListener('click', function() {
+                const refreshBtn = this;
+                const spinner = document.getElementById('refreshSpinner');
+                
+                // Show spinner
+                spinner.classList.remove('d-none');
+                refreshBtn.disabled = true;
+                
+                // Get repository path from results
+                const repoPath = "{{ results.directory }}";
+                
+                // Send request to refresh evaluation
+                fetch('/refresh', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        repo_path: repoPath
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Reload page to show updated results
+                        window.location.reload();
+                    } else {
+                        alert(`Error: ${data.error}`);
+                        // Hide spinner
+                        spinner.classList.add('d-none');
+                        refreshBtn.disabled = false;
+                    }
+                })
+                .catch(error => {
+                    alert(`Error: ${error.message}`);
+                    // Hide spinner
+                    spinner.classList.add('d-none');
+                    refreshBtn.disabled = false;
+                });
+            });
+        });
+    </script>
+</body>
+</html> 

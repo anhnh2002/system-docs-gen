@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DocAgent - Docstring Evaluation System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container my-5">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="card shadow">
+                    <div class="bg-dark text-white p-3 d-flex justify-content-between align-items-center">
+                        <h2 class="mb-0">DocAgent - Docstring Evaluation System</h2>
+                        <img src="{{ url_for('static', filename='assets/meta_logo_white.png') }}" alt="Meta Logo" class="header-logo" height="30">
+                    </div>
+                    <div class="card-body">
+                        <form id="configForm">
+                            <h4 class="mb-4">LLM Configuration</h4>
+                            
+                            <div class="mb-3">
+                                <label for="llm_type" class="form-label">LLM Type</label>
+                                <select class="form-select" id="llm_type" name="llm_type" required>
+                                    <option value="openai">OpenAI</option>
+                                    <option value="claude">Claude (Anthropic)</option>
+                                </select>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="api_key" class="form-label">API Key</label>
+                                <input type="password" class="form-control" id="api_key" name="api_key" required>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="model" class="form-label">Model</label>
+                                <input type="text" class="form-control" id="model" name="model" placeholder="e.g., gpt-4, claude-3-opus-20240229" required>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="temperature" class="form-label">Temperature</label>
+                                    <input type="number" class="form-control" id="temperature" name="temperature" min="0" max="1" step="0.1" value="0.1" required>
+                                </div>
+                                
+                                <div class="col-md-6 mb-3">
+                                    <label for="max_tokens" class="form-label">Max Tokens</label>
+                                    <input type="number" class="form-control" id="max_tokens" name="max_tokens" min="100" step="1" value="4096" required>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <button type="button" id="testApiBtn" class="btn btn-outline-primary">
+                                    <span id="testApiSpinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                                    Test API Connection
+                                </button>
+                                <div id="apiTestResult" class="mt-2"></div>
+                            </div>
+                            
+                            <hr class="my-4">
+                            
+                            <h4 class="mb-4">Repository Configuration</h4>
+                            <div class="mb-3">
+                                <label for="repo_path" class="form-label">Repository Path</label>
+                                <input type="text" class="form-control" id="repo_path" name="repo_path" placeholder="e.g., /path/to/repository" required>
+                            </div>
+                            
+                            <div class="d-grid">
+                                <button type="button" id="evaluateBtn" class="btn btn-primary">
+                                    <span id="evaluateSpinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                                    Start Evaluation
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Test API Connection button
+            document.getElementById('testApiBtn').addEventListener('click', function() {
+                const testApiBtn = this;
+                const spinner = document.getElementById('testApiSpinner');
+                const resultDiv = document.getElementById('apiTestResult');
+                
+                // Get form data
+                const llmType = document.getElementById('llm_type').value;
+                const apiKey = document.getElementById('api_key').value;
+                const model = document.getElementById('model').value;
+                const temperature = document.getElementById('temperature').value;
+                const maxTokens = document.getElementById('max_tokens').value;
+                
+                // Validate form
+                if (!llmType || !apiKey || !model || !temperature || !maxTokens) {
+                    resultDiv.innerHTML = '<div class="alert alert-danger">Please fill in all LLM configuration fields</div>';
+                    return;
+                }
+                
+                // Show spinner
+                spinner.classList.remove('d-none');
+                testApiBtn.disabled = true;
+                resultDiv.innerHTML = '';
+                
+                // Send request to test API
+                fetch('/test_api', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        llm_type: llmType,
+                        api_key: apiKey,
+                        model: model,
+                        temperature: temperature,
+                        max_tokens: maxTokens
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        resultDiv.innerHTML = `<div class="alert alert-success">
+                            <strong>Success!</strong> API connection works.
+                            <p class="mt-2"><strong>Response:</strong> ${data.response}</p>
+                        </div>`;
+                    } else {
+                        resultDiv.innerHTML = `<div class="alert alert-danger">
+                            <strong>Error:</strong> ${data.error}
+                        </div>`;
+                    }
+                })
+                .catch(error => {
+                    resultDiv.innerHTML = `<div class="alert alert-danger">
+                        <strong>Error:</strong> ${error.message}
+                    </div>`;
+                })
+                .finally(() => {
+                    // Hide spinner
+                    spinner.classList.add('d-none');
+                    testApiBtn.disabled = false;
+                });
+            });
+            
+            // Start Evaluation button
+            document.getElementById('evaluateBtn').addEventListener('click', function() {
+                const evaluateBtn = this;
+                const spinner = document.getElementById('evaluateSpinner');
+                
+                // Get repository path
+                const repoPath = document.getElementById('repo_path').value;
+                
+                // Validate repository path
+                if (!repoPath) {
+                    alert('Please enter a repository path');
+                    return;
+                }
+                
+                // Validate LLM configuration
+                const llmType = document.getElementById('llm_type').value;
+                const apiKey = document.getElementById('api_key').value;
+                const model = document.getElementById('model').value;
+                const temperature = document.getElementById('temperature').value;
+                const maxTokens = document.getElementById('max_tokens').value;
+                
+                if (!llmType || !apiKey || !model || !temperature || !maxTokens) {
+                    alert('Please fill in all LLM configuration fields');
+                    return;
+                }
+                
+                // Show spinner
+                spinner.classList.remove('d-none');
+                evaluateBtn.disabled = true;
+                
+                // Send request to evaluate repository
+                fetch('/evaluate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        repo_path: repoPath
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.href = data.redirect;
+                    } else {
+                        alert(`Error: ${data.error}`);
+                        // Hide spinner
+                        spinner.classList.add('d-none');
+                        evaluateBtn.disabled = false;
+                    }
+                })
+                .catch(error => {
+                    alert(`Error: ${error.message}`);
+                    // Hide spinner
+                    spinner.classList.add('d-none');
+                    evaluateBtn.disabled = false;
+                });
+            });
+        });
+    </script>
+</body>
+</html> 

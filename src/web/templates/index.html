@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DocAgent - Docstring Generation</title>
+    
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container-fluid vh-100 p-0 d-flex flex-column">
+        <!-- Header -->
+        <header class="bg-dark text-white p-3 d-flex justify-content-between align-items-center">
+            <h1 class="h3 mb-0">DocAgent </h1>
+            <img src="{{ url_for('static', filename='assets/meta_logo_white.png') }}" alt="Meta Logo" class="header-logo" height="30">
+        </header>
+        
+        <div class="row flex-grow-1 m-0">
+            <!-- Sidebar for configuration and completeness -->
+            <div id="sidebar" class="col-md-3 bg-light p-3 sidebar">
+                <div id="config-section">
+                    <h2 class="h4 mb-3">Configuration</h2>
+                    <form id="config-form">
+                        <div class="mb-3">
+                            <label for="repo-path" class="form-label">Repository Path</label>
+                            <input type="text" class="form-control" id="repo-path" placeholder="e.g., data/raw_test_repo">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">LLM Configuration</label>
+                            <div class="card p-2 mb-2">
+                                <div class="mb-2">
+                                    <label for="llm-type" class="form-label">Type</label>
+                                    <select class="form-select" id="llm-type">
+                                        <option value="claude">Claude</option>
+                                        <option value="openai">OpenAI</option>
+                                        <option value="huggingface">HuggingFace</option>
+                                    </select>
+                                </div>
+                                <div class="mb-2">
+                                    <label for="llm-api-key" class="form-label">API Key</label>
+                                    <input type="password" class="form-control" id="llm-api-key">
+                                </div>
+                                <div class="mb-2">
+                                    <label for="llm-model" class="form-label">Model</label>
+                                    <input type="text" class="form-control" id="llm-model" placeholder="e.g., claude-3-5-haiku-latest">
+                                </div>
+                                <div class="mb-2">
+                                    <label for="llm-temperature" class="form-label">Temperature</label>
+                                    <input type="number" class="form-control" id="llm-temperature" min="0" max="1" step="0.1" value="0.1">
+                                </div>
+                                <div class="mb-2">
+                                    <label for="llm-max-tokens" class="form-label">Max Tokens</label>
+                                    <input type="number" class="form-control" id="llm-max-tokens" value="4096">
+                                </div>
+                                <div class="text-end">
+                                    <button type="button" class="btn btn-outline-primary btn-sm" id="test-api-button">
+                                        <i class="fas fa-vial"></i> Test API
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Flow Control</label>
+                            <div class="card p-2 mb-2">
+                                <div class="mb-2">
+                                    <label for="max-reader-search-attempts" class="form-label">Max Reader Search Attempts</label>
+                                    <input type="number" class="form-control" id="max-reader-search-attempts" value="2">
+                                </div>
+                                <div class="mb-2">
+                                    <label for="max-verifier-rejections" class="form-label">Max Verifier Rejections</label>
+                                    <input type="number" class="form-control" id="max-verifier-rejections" value="1">
+                                </div>
+                                <div class="mb-2">
+                                    <label for="status-sleep-time" class="form-label">Status Sleep Time (s)</label>
+                                    <input type="number" class="form-control" id="status-sleep-time" value="1">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Docstring Options</label>
+                            <div class="card p-2 mb-2">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="overwrite-docstrings">
+                                    <label class="form-check-label" for="overwrite-docstrings">
+                                        Overwrite Existing Docstrings
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary w-100" id="start-button">Start Generation</button>
+                    </form>
+                </div>
+                
+                <div id="completeness-section" class="mt-4 d-none">
+                    <h2 class="h4 mb-3">Completeness</h2>
+                    <div id="completeness-data" class="card p-3">
+                        <div class="text-center">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2">Loading completeness data...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Main content -->
+            <div id="main-content" class="col-md-9 p-0 d-none">
+                <div class="row h-100 m-0">
+                    <!-- Left Top: Status Visualizer -->
+                    <div class="col-md-6 p-2 h-50">
+                        <div class="card h-100">
+                            <div class="card-header bg-primary text-white">
+                                Agent Status
+                            </div>
+                            <div class="card-body overflow-auto d-flex flex-column">
+                                <div id="agent-workflow" class="flex-grow-1">
+                                    <!-- Agent workflow visualization will be rendered here -->
+                                </div>
+                                <div id="status-visualizer" class="mt-2 p-2 border-top">
+                                    <div class="text-center py-2">
+                                        <p>No active agent</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Right Top: Repository Structure -->
+                    <div class="col-md-6 p-2 h-50">
+                        <div class="card h-100">
+                            <div class="card-header bg-primary text-white">
+                                Repository Structure
+                            </div>
+                            <div class="card-body overflow-auto">
+                                <div id="repo-structure">
+                                    <div class="text-center py-4">
+                                        <p>No repository selected</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Bottom: Logs -->
+                    <div class="col-md-12 p-2 h-50">
+                        <div class="card h-100">
+                            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                                <span>Logs</span>
+                                <small id="progress-time" class="text-white">Elapsed: 00:00</small>
+                            </div>
+                            <div class="card-body d-flex flex-column">
+                                <div id="log-container" class="flex-grow-1 overflow-auto bg-dark text-light p-2 font-monospace">
+                                    <div id="log-content">
+                                        <!-- Log messages will be appended here -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- API Test Modal -->
+    <div class="modal fade" id="api-test-modal" tabindex="-1" aria-labelledby="api-test-modal-label" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="api-test-modal-label">API Test Result</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="api-test-result">
+                    <div class="text-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Testing API...</span>
+                        </div>
+                        <p class="mt-2">Testing API connection...</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Bootstrap and jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Socket.IO -->
+    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+    
+    <!-- D3.js for visualization -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    
+    <!-- Custom JavaScript -->
+    <script src="{{ url_for('static', filename='js/config.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/status-visualizer.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/repo-structure.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/log-handler.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/completeness.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html> 
