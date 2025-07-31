@@ -339,24 +339,28 @@ class DependencyParser:
         # filter folders
         logger.info(f"Filtering folders ...")
         try:
+            raise Exception("test")
             filtered_folders = self.filter_folders()
             logger.info(f"Filtered folders: {filtered_folders}")
         except Exception as e:
             logger.warning(f"Error filtering folders: {e}")
-            filtered_folders = []
+            filtered_folders = None
         
         # First pass: collect all modules and code components
         for root, _, files in os.walk(self.repo_path):
             for file in files:
+                
                 if not file.endswith(".py"):
                     continue
 
                 # ignore docs, tests folders
-                if any(fnmatch.fnmatch(file, pattern) or (pattern in root) for pattern in DEFAULT_IGNORE_PATTERNS):
+                if any(fnmatch.fnmatch(file, pattern) or (pattern in root.split(os.path.sep)) for pattern in DEFAULT_IGNORE_PATTERNS):
                     continue
 
-                if not any(str(Path(root).relative_to(self.repo_path)).startswith(filtered_folder) for filtered_folder in filtered_folders):
+                if filtered_folders and not any(str(Path(root).relative_to(self.repo_path)).startswith(filtered_folder) for filtered_folder in filtered_folders):
                     continue
+
+                
                 
                 file_path = os.path.join(root, file)
                 relative_path = os.path.relpath(file_path, self.repo_path)
@@ -730,7 +734,7 @@ class DependencyParser:
         
         prompt = FILTER_FOLDERS_PROMPT.format(files=get_items_at_depth_pathlib(self.repo_path, 1), project_name=Path(self.repo_path).name)
 
-        response = call_llm(prompt)
+        response = call_llm(prompt, model="claude-sonnet-4")
 
         # regrex get content between [ and ]
         match = re.search(r'\[.*?\]', response, re.DOTALL)

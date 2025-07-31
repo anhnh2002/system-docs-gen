@@ -305,6 +305,4 @@ def get_leaf_nodes(graph: Dict[str, Set[str]]) -> List[str]:
         logger.warning("No leaf nodes found in the graph")
         return []
     
-    logger.info(f"Found {len(concise_leaf_nodes)} leaf nodes: {'\n'.join(sorted(concise_leaf_nodes))}")
-    
     return concise_leaf_nodes 
