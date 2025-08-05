@@ -17,6 +17,7 @@ import io
 
 from pydantic_ai import RunContext, Tool
 from .deps import DocAgentDeps
+from utils import validate_mermaid_diagrams
 
 
 # There are some super strange "ascii can't decode x" errors,
@@ -698,7 +699,7 @@ class EditTool:
         file_content = "\n".join([f"{i + init_line:6}\t{line}" for i, line in enumerate(file_content.split("\n"))])
         return f"Here's the result of running `cat -n` on {file_descriptor}:\n" + file_content + "\n"
 
-def str_replace_editor(
+async def str_replace_editor(
     ctx: RunContext[DocAgentDeps],
     command: Literal["view", "create", "str_replace", "insert", "undo_edit"],
     path: str,
@@ -727,11 +728,11 @@ def str_replace_editor(
 
 
     tool = EditTool(ctx.deps.registry, ctx.deps.absolute_docs_path)
-    path = str(Path(ctx.deps.absolute_docs_path) / path)
+    absolute_path = str(Path(ctx.deps.absolute_docs_path) / path)
     
     tool(
         command=command,
-        path=path,
+        path=absolute_path,
         file_text=file_text,
         view_range=view_range,
         old_str=old_str,
@@ -739,7 +740,12 @@ def str_replace_editor(
         insert_line=insert_line,
     )
 
-    return "\n".join(tool.logs)
+    result = "\n".join(tool.logs)
+
+    if command != "view" and path.endswith(".md"):
+        result = result + "\n---------- Mermaid validation ----------\n" + validate_mermaid_diagrams(absolute_path, path)
+
+    return result
 
 
 str_replace_editor_tool = Tool(
@@ -755,69 +761,3 @@ Custom editing tool for viewing, creating and editing files
 """.strip(),
     takes_ctx=True
 )
-
-# str_replace_editor_tool = Tool.from_schema(
-#     function=str_replace_editor,
-#     name="str_replace_editor",
-#     description="""
-# Custom editing tool for viewing, creating and editing files
-#     * State is persistent across command calls and discussions with the user
-#     * If `path` is a file, `view` displays the result of applying `cat -n`. If `path` is a directory, `view` lists non-hidden files and directories up to 2 levels deep.
-#     * The `create` command cannot be used if the specified `path` already exists as a file
-#     * If a `command` generates a long output, it will be truncated and marked with `<response clipped>`
-#     * The `undo_edit` command will revert the last edit made to the file at `path`
-
-#     Notes for using the `str_replace` command:
-#     * The `old_str` parameter should match EXACTLY one or more consecutive lines from the original file. Be mindful of whitespaces!
-#     * If the `old_str` parameter is not unique in the file, the replacement will not be performed. Make sure to include enough context in `old_str` to make it unique
-#     * The `new_str` parameter should contain the edited lines that should replace the `old_str`
-
-#     Notes for using the `view` command:
-#     * ONLY use `cat -n` when view_file_summary or get_implementation got error.
-# """.strip(),
-#     json_schema={
-#         'properties': {
-#             'command': {
-#                 'type': 'string',
-#                 'description': 'The commands to run. Allowed options are: `view`, `create`, `str_replace`, `insert`, `undo_edit`.',
-#                 # 'enum': ['view', 'create', 'str_replace', 'insert', 'undo_edit'],
-#                 # 'required': True,
-#             },
-#             'path': {
-#                 'type': 'string',
-#                 'description': 'Path to file or directory, e.g. `./chat_core.md` or `./agents/`',
-#                 # 'required': True,
-#             },
-#             'file_text': {
-#                 'type': 'string',
-#                 'description': 'Required parameter of `create` command, with the content of the file to be created.',
-#                 # 'required': False,
-#             },
-#             'old_str': {
-#                 'type': 'string',
-#                 'description': 'Required parameter of `str_replace` command containing the string in `path` to replace.',
-#                 # 'required': False,
-#             },
-#             'new_str': {
-#                 'type': 'string',
-#                 'description': 'Optional parameter of `str_replace` command containing the new string (if not given, no string will be added). Required parameter of `insert` command containing the string to insert.',
-#                 # 'required': False,
-#             },
-#             'insert_line': {
-#                 'type': 'integer',
-#                 'description': 'Required parameter of `insert` command. The `new_str` will be inserted AFTER the line `insert_line` of `path`.',
-#                 # 'required': False,
-#             },
-#             'view_range': {
-#                 'type': 'array',
-#                 'items': {'type': 'integer'},
-#                 'description': 'Optional parameter of `view` command when `path` points to a file. If none is given, the full file is shown. If provided, the file will be shown in the indicated line number range, e.g. [11, 12] will show lines 11 and 12. Indexing at 1 to start. Setting `[start_line, -1]` shows all lines from `start_line` to the end of the file.',
-#                 # 'required': False,
-#             },
-#         },
-#         'required': ['command', 'path'],
-#         'type': 'object',
-#     }
-# )
-
-# str_replace_editor_tool.takes_ctx = True
