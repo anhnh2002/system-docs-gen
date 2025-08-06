@@ -3,6 +3,11 @@ import re
 import mermaid as md
 from pathlib import Path
 from typing import List, Tuple
+import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def is_complex_module(components: dict[str, CodeComponent], core_component_ids: list[str]) -> bool:
     files = set()
@@ -26,6 +31,7 @@ def validate_mermaid_diagrams(md_file_path: str, relative_path: str) -> str:
         "All mermaid diagrams are syntax correct" if all diagrams are valid,
         otherwise returns error message with details about invalid diagrams
     """
+
     try:
         # Read the markdown file
         file_path = Path(md_file_path)
@@ -40,14 +46,24 @@ def validate_mermaid_diagrams(md_file_path: str, relative_path: str) -> str:
         if not mermaid_blocks:
             return "No mermaid diagrams found in the file"
         
-        # Validate each mermaid diagram
+        # Validate each mermaid diagram in parallel
         errors = []
-        for i, (line_start, diagram_content) in enumerate(mermaid_blocks, 1):
-            error_msg = validate_single_diagram(diagram_content, i, line_start)
-            if error_msg:
-                errors.append("\n")
-                errors.append(error_msg)
-                errors.append("\n")
+        with ThreadPoolExecutor(max_workers=min(len(mermaid_blocks), 10)) as executor:
+            # Submit all validation tasks
+            future_to_info = {}
+            for i, (line_start, diagram_content) in enumerate(mermaid_blocks, 1):
+                future = executor.submit(validate_single_diagram, diagram_content, i, line_start)
+                future_to_info[future] = i
+            
+            # Collect results as they complete
+            for future in as_completed(future_to_info):
+                error_msg = future.result()
+                if error_msg:
+                    errors.append("\n")
+                    errors.append(error_msg)
+        
+        if errors:
+            logger.info(f"Mermaid syntax errors found in file: {md_file_path}: {errors}")
         
         if errors:
             return "Mermaid syntax errors found in file: " + relative_path + "\n" + "\n".join(errors)

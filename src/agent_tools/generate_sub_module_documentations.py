@@ -1,7 +1,7 @@
 from pydantic_ai import RunContext, Tool, Agent
 import json
 
-from .deps import DocAgentDeps
+from .deps import DeepwikiAgentDeps
 from .read_code_components import read_code_components_tool
 from .str_replace_editor import str_replace_editor_tool
 from llm_services import fallback_models
@@ -10,10 +10,8 @@ from utils import is_complex_module
 
 
 
-
-
 async def generate_sub_module_documentation(
-    ctx: RunContext[DocAgentDeps],
+    ctx: RunContext[DeepwikiAgentDeps],
     sub_module_specs: dict[str, list[str]]
 ) -> str:
     """Generate detailed description of a given sub-module specs to the sub-agents
@@ -37,14 +35,14 @@ async def generate_sub_module_documentation(
         if is_complex_module(ctx.deps.components, core_component_ids):
             sub_agent = Agent(
                 model=fallback_models,
-                deps_type=DocAgentDeps,
+                deps_type=DeepwikiAgentDeps,
                 system_prompt=SYSTEM_PROMPT.format(module_name=sub_module_name),
                 tools=[read_code_components_tool, str_replace_editor_tool, generate_sub_module_documentation_tool],
             )
         else:
             sub_agent = Agent(
                 model=fallback_models,
-                deps_type=DocAgentDeps,
+                deps_type=DeepwikiAgentDeps,
                 system_prompt=LEAF_SYSTEM_PROMPT.format(module_name=sub_module_name),
                 tools=[read_code_components_tool, str_replace_editor_tool],
             )
@@ -53,7 +51,7 @@ async def generate_sub_module_documentation(
         deps.path_to_current_module.append(sub_module_name)
 
         # log the current module tree
-        print(f"Current module tree: {json.dumps(deps.module_tree, indent=4)}")
+        # print(f"Current module tree: {json.dumps(deps.module_tree, indent=4)}")
 
         result = await sub_agent.run(
             format_user_prompt(
@@ -68,7 +66,6 @@ async def generate_sub_module_documentation(
         # remove the sub-module name from the path to current module and the module tree
         deps.path_to_current_module.pop()
             
-
 
     # restore the previous module name
     deps.current_module_name = previous_module_name

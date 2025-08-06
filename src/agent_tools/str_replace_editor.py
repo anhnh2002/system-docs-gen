@@ -16,7 +16,7 @@ from typing import List, Optional, Tuple, Literal
 import io
 
 from pydantic_ai import RunContext, Tool
-from .deps import DocAgentDeps
+from .deps import DeepwikiAgentDeps
 from utils import validate_mermaid_diagrams
 
 
@@ -387,7 +387,8 @@ class EditTool:
         **kwargs,
     ):
         _path = Path(path)
-        self.validate_path(command, _path)
+        if not self.validate_path(command, _path):
+            return
         if command == "view":
             return self.view(_path, view_range)
         elif command == "create":
@@ -426,19 +427,20 @@ class EditTool:
             self.logs.append(
                 f"The path {self._get_display_path(path)} is not an absolute path, it should start with `/`. Maybe you meant {self._get_display_path(suggested_path)}?"
             )
-            return
+            return False
         # Check if path exists
         if not path.exists() and command != "create":
             self.logs.append(f"The path {self._get_display_path(path)} does not exist. Please provide a valid path.")
-            return
+            return False
         if path.exists() and command == "create":
             self.logs.append(f"File already exists at: {self._get_display_path(path)}. Cannot overwrite files using command `create`.")
-            return
+            return False
         # Check if the path points to a directory
         if path.is_dir():
             if command != "view":
                 self.logs.append(f"The path {self._get_display_path(path)} is a directory and only the `view` command can be used on directories")
-                return
+                return False
+        return True
 
     def create_file(self, path: Path, file_text: str):
         if not path.parent.exists():
@@ -700,7 +702,8 @@ class EditTool:
         return f"Here's the result of running `cat -n` on {file_descriptor}:\n" + file_content + "\n"
 
 async def str_replace_editor(
-    ctx: RunContext[DocAgentDeps],
+    ctx: RunContext[DeepwikiAgentDeps],
+    working_dir: Literal["repo", "docs"],
     command: Literal["view", "create", "str_replace", "insert", "undo_edit"],
     path: str,
     file_text: Optional[str] = None,
@@ -716,8 +719,10 @@ async def str_replace_editor(
         * The `create` command cannot be used if the specified `path` already exists as a file
         * If a `command` generates a long output, it will be truncated and marked with `<response clipped>`
         * The `undo_edit` command will revert the last edit made to the file at `path`
+        * Only `view` command is allowed when `working_dir` is `repo`.
 
     Args:
+        working_dir: The working directory to use. Choose `repo` to work with the repository files, or `docs` to work with the generated documentation files.
         command: The command to run. Allowed options are: `view`, `create`, `str_replace`, `insert`, `undo_edit`.
         path: Path to file or directory, e.g. `./chat_core.md` or `./agents/`
         file_text: Required parameter of `create` command, with the content of the file to be created.
@@ -728,7 +733,14 @@ async def str_replace_editor(
 
 
     tool = EditTool(ctx.deps.registry, ctx.deps.absolute_docs_path)
-    absolute_path = str(Path(ctx.deps.absolute_docs_path) / path)
+    if working_dir == "docs":
+        absolute_path = str(Path(ctx.deps.absolute_docs_path) / path)
+    else:
+        absolute_path = str(Path(ctx.deps.absolute_repo_path) / path)
+
+    # validate command
+    if command != "view" and working_dir == "repo":
+        return "The `view` command is the only allowed command when `working_dir` is `repo`."
     
     tool(
         command=command,
@@ -758,6 +770,7 @@ Custom editing tool for viewing, creating and editing files
     * The `create` command cannot be used if the specified `path` already exists as a file
     * If a `command` generates a long output, it will be truncated and marked with `<response clipped>`
     * The `undo_edit` command will revert the last edit made to the file at `path`
+    * Only `view` command is allowed when `working_dir` is `repo`.
 """.strip(),
     takes_ctx=True
 )
