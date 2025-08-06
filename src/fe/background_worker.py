@@ -4,6 +4,7 @@ Background worker for processing documentation generation jobs.
 """
 
 import os
+import json
 import time
 import threading
 import subprocess
@@ -12,6 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from queue import Queue
 from typing import Dict
+from dataclasses import asdict
 
 from main import DocumentationGenerator, Config
 from .models import JobStatus
@@ -29,6 +31,8 @@ class BackgroundWorker:
         self.running = False
         self.processing_queue = Queue(maxsize=WebAppConfig.QUEUE_SIZE)
         self.job_status: Dict[str, JobStatus] = {}
+        self.jobs_file = Path(WebAppConfig.CACHE_DIR) / "jobs.json"
+        self.load_job_statuses()
     
     def start(self):
         """Start the background worker thread."""
@@ -54,6 +58,95 @@ class BackgroundWorker:
     def get_all_jobs(self) -> Dict[str, JobStatus]:
         """Get all job statuses."""
         return self.job_status
+    
+    def load_job_statuses(self):
+        """Load job statuses from disk."""
+        if not self.jobs_file.exists():
+            # Try to reconstruct from cache if no job file exists
+            self._reconstruct_jobs_from_cache()
+            return
+        
+        try:
+            with open(self.jobs_file, 'r') as f:
+                data = json.load(f)
+                
+            for job_id, job_data in data.items():
+                # Only load completed jobs to avoid inconsistent state
+                if job_data.get('status') == 'completed':
+                    self.job_status[job_id] = JobStatus(
+                        job_id=job_data['job_id'],
+                        repo_url=job_data['repo_url'],
+                        status=job_data['status'],
+                        created_at=datetime.fromisoformat(job_data['created_at']),
+                        started_at=datetime.fromisoformat(job_data['started_at']) if job_data.get('started_at') else None,
+                        completed_at=datetime.fromisoformat(job_data['completed_at']) if job_data.get('completed_at') else None,
+                        error_message=job_data.get('error_message'),
+                        progress=job_data.get('progress', ''),
+                        docs_path=job_data.get('docs_path')
+                    )
+            print(f"Loaded {len([j for j in self.job_status.values() if j.status == 'completed'])} completed jobs from disk")
+        except Exception as e:
+            print(f"Error loading job statuses: {e}")
+    
+    def _reconstruct_jobs_from_cache(self):
+        """Reconstruct job statuses from cache entries for backward compatibility."""
+        try:
+            cache_entries = self.cache_manager.cache_index
+            reconstructed_count = 0
+            
+            for repo_hash, cache_entry in cache_entries.items():
+                # Extract repo info to create job_id
+                from .github_processor import GitHubRepoProcessor
+                try:
+                    repo_info = GitHubRepoProcessor.get_repo_info(cache_entry.repo_url)
+                    job_id = repo_info['full_name'].replace('/', '--')
+                    
+                    # Only add if job doesn't already exist
+                    if job_id not in self.job_status:
+                        self.job_status[job_id] = JobStatus(
+                            job_id=job_id,
+                            repo_url=cache_entry.repo_url,
+                            status='completed',
+                            created_at=cache_entry.created_at,
+                            completed_at=cache_entry.created_at,
+                            docs_path=cache_entry.docs_path,
+                            progress="Reconstructed from cache"
+                        )
+                        reconstructed_count += 1
+                except Exception as e:
+                    print(f"Failed to reconstruct job for {cache_entry.repo_url}: {e}")
+            
+            if reconstructed_count > 0:
+                print(f"Reconstructed {reconstructed_count} job statuses from cache")
+                self.save_job_statuses()
+                
+        except Exception as e:
+            print(f"Error reconstructing jobs from cache: {e}")
+    
+    def save_job_statuses(self):
+        """Save job statuses to disk."""
+        try:
+            # Ensure cache directory exists
+            self.jobs_file.parent.mkdir(parents=True, exist_ok=True)
+            
+            data = {}
+            for job_id, job in self.job_status.items():
+                data[job_id] = {
+                    'job_id': job.job_id,
+                    'repo_url': job.repo_url,
+                    'status': job.status,
+                    'created_at': job.created_at.isoformat(),
+                    'started_at': job.started_at.isoformat() if job.started_at else None,
+                    'completed_at': job.completed_at.isoformat() if job.completed_at else None,
+                    'error_message': job.error_message,
+                    'progress': job.progress,
+                    'docs_path': job.docs_path
+                }
+            
+            with open(self.jobs_file, 'w') as f:
+                json.dump(data, f, indent=2)
+        except Exception as e:
+            print(f"Error saving job statuses: {e}")
     
     def _worker_loop(self):
         """Main worker loop."""
@@ -88,6 +181,10 @@ class BackgroundWorker:
                 job.completed_at = datetime.now()
                 job.docs_path = cached_docs
                 job.progress = "Documentation retrieved from cache"
+                
+                # Save job status to disk
+                self.save_job_statuses()
+                
                 print(f"Job {job_id}: Using cached documentation")
                 return
             
@@ -134,6 +231,9 @@ class BackgroundWorker:
             job.completed_at = datetime.now()
             job.docs_path = docs_path
             job.progress = "Documentation generation completed"
+            
+            # Save job status to disk
+            self.save_job_statuses()
             
             print(f"Job {job_id}: Documentation generated successfully")
             

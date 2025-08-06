@@ -175,14 +175,43 @@ class WebRoutes:
     async def serve_generated_docs(self, job_id: str, filename: str = "overview.md") -> HTMLResponse:
         """Serve generated documentation files."""
         job = self.background_worker.get_job_status(job_id)
-        if not job:
-            raise HTTPException(status_code=404, detail="Job not found")
+        docs_path = None
+        repo_url = None
         
-        if job.status != 'completed' or not job.docs_path:
-            raise HTTPException(status_code=404, detail="Documentation not available")
+        if job:
+            # Job status exists - use it
+            if job.status != 'completed' or not job.docs_path:
+                raise HTTPException(status_code=404, detail="Documentation not available")
+            docs_path = Path(job.docs_path)
+            repo_url = job.repo_url
+        else:
+            # No job status - try to find documentation in cache by job_id
+            # Convert job_id back to repo full name and construct potential paths
+            repo_full_name = self._job_id_to_repo_full_name(job_id)
+            potential_repo_url = f"https://github.com/{repo_full_name}"
+            
+            # Check if documentation exists in cache
+            cached_docs = self.cache_manager.get_cached_docs(potential_repo_url)
+            if cached_docs and Path(cached_docs).exists():
+                docs_path = Path(cached_docs)
+                repo_url = potential_repo_url
+                
+                # Recreate job status for consistency
+                job = JobStatus(
+                    job_id=job_id,
+                    repo_url=potential_repo_url,
+                    status='completed',
+                    created_at=datetime.now(),
+                    completed_at=datetime.now(),
+                    docs_path=cached_docs,
+                    progress="Loaded from cache"
+                )
+                self.background_worker.job_status[job_id] = job
+                self.background_worker.save_job_statuses()
+            else:
+                raise HTTPException(status_code=404, detail="Documentation not found")
         
-        docs_path = Path(job.docs_path)
-        if not docs_path.exists():
+        if not docs_path or not docs_path.exists():
             raise HTTPException(status_code=404, detail="Documentation files not found")
         
         # Load module tree
@@ -212,7 +241,7 @@ class WebRoutes:
             title = get_file_title(file_path)
             
             context = {
-                "repo_name": job.repo_url.split("/")[-1],
+                "repo_name": repo_url.split("/")[-1],
                 "title": title,
                 "content": html_content,
                 "navigation": module_tree,
