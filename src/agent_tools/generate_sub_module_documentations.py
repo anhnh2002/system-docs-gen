@@ -32,7 +32,7 @@ async def generate_sub_module_documentation(
     
     for sub_module_name, core_component_ids in sub_module_specs.items():
         
-        if is_complex_module(ctx.deps.components, core_component_ids):
+        if is_complex_module(ctx.deps.components, core_component_ids) and ctx.deps.current_depth < ctx.deps.max_depth:
             sub_agent = Agent(
                 model=fallback_models,
                 deps_type=DeepwikiAgentDeps,
@@ -49,7 +49,7 @@ async def generate_sub_module_documentation(
 
         deps.current_module_name = sub_module_name
         deps.path_to_current_module.append(sub_module_name)
-
+        deps.current_depth += 1
         # log the current module tree
         # print(f"Current module tree: {json.dumps(deps.module_tree, indent=4)}")
 
@@ -65,7 +65,7 @@ async def generate_sub_module_documentation(
 
         # remove the sub-module name from the path to current module and the module tree
         deps.path_to_current_module.pop()
-            
+        deps.current_depth -= 1
 
     # restore the previous module name
     deps.current_module_name = previous_module_name

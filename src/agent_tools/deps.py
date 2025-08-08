@@ -10,3 +10,5 @@ class DeepwikiAgentDeps:
     path_to_current_module: list[str]
     current_module_name: str
     module_tree: dict[str, any]
+    max_depth: int
+    current_depth: int

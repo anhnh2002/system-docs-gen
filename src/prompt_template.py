@@ -77,7 +77,7 @@ Generate documentation following the following requirements:
 """.strip()
 
 USER_PROMPT = """
-Generate comprehensive documentation for the {module_name} module using the provided core components.
+Generate comprehensive documentation for the {module_name} module using the provided module tree and core components.
 
 <MODULE_TREE>
 {module_tree}
@@ -108,8 +108,79 @@ overview_content
 </OVERVIEW>
 """
 
+CLUSTER_REPO_PROMPT = """
+Here is list of all potential core components of the repository (It's normal that some components are not essential to the repository):
+<POTENTIAL_CORE_COMPONENTS>
+{potential_core_components}
+</POTENTIAL_CORE_COMPONENTS>
+
+Please group the components into groups such that each group is a set of components that are closely related to each other and together they form a module. DO NOT include components that are not essential to the repository.
+Firstly reason about the components and then group them and return the result in the following format:
+<GROUPED_COMPONENTS>
+{{
+    "module_name_1": {{
+        "path": <path_to_the_module_1>, # the path to the module can be file or directory
+        "components": [
+            <component_name_1>,
+            <component_name_2>,
+            ...
+        ]
+    }},
+    "module_name_2": {{
+        "path": <path_to_the_module_2>,
+        "components": [
+            <component_name_1>,
+            <component_name_2>,
+            ...
+        ]
+    }},
+    ...
+}}
+</GROUPED_COMPONENTS>
+""".strip()
+
+CLUSTER_MODULE_PROMPT = """
+Here is the module tree of a repository:
+
+<MODULE_TREE>
+{module_tree}
+</MODULE_TREE>
+
+Here is list of all potential core components of the module {module_name} (It's normal that some components are not essential to the module):
+<POTENTIAL_CORE_COMPONENTS>
+{potential_core_components}
+</POTENTIAL_CORE_COMPONENTS>
+
+Please group the components into groups such that each group is a set of components that are closely related to each other and together they form a smaller module. DO NOT include components that are not essential to the module.
+
+Firstly reason based on given context and then group them and return the result in the following format:
+<GROUPED_COMPONENTS>
+{{
+    "module_name_1": {{
+        "path": <path_to_the_module_1>, # the path to the module can be file or directory
+        "components": [
+            <component_name_1>,
+            <component_name_2>,
+            ...
+        ]
+    }},
+    "module_name_2": {{
+        "path": <path_to_the_module_2>,
+        "components": [
+            <component_name_1>,
+            <component_name_2>,
+            ...
+        ]
+    }},
+    ...
+}}
+</GROUPED_COMPONENTS>
+""".strip()
+
+import json
 from typing import Dict
 from dependency_analyzer import CodeComponent
+from utils import file_manager
 
 EXTENSION_TO_LANGUAGE = {
     ".py": "python",
@@ -183,8 +254,7 @@ def format_user_prompt(module_name: str, core_component_ids: list[str], componen
         
         # Read content of the file using the first component's file path
         try:
-            with open(components[component_ids_in_file[0]].file_path, "r", encoding="utf-8") as f:
-                core_component_codes += f.read()
+            core_component_codes += file_manager.load_text(components[component_ids_in_file[0]].file_path)
         except (FileNotFoundError, IOError) as e:
             core_component_codes += f"# Error reading file: {e}\n"
         
@@ -192,4 +262,35 @@ def format_user_prompt(module_name: str, core_component_ids: list[str], componen
         
     return USER_PROMPT.format(module_name=module_name, formatted_core_component_codes=core_component_codes, module_tree=formatted_module_tree)
 
-#Know that the module is a part of a larger system and it has dependencies on other modules.
+
+
+def format_cluster_prompt(potential_core_components: str, module_tree: dict[str, any] = {}, module_name: str = None) -> str:
+    """
+    Format the cluster prompt with potential core components and module tree.
+    """
+
+    # format module tree
+    lines = []
+
+    print(f"Module tree:\n{json.dumps(module_tree, indent=2)}")
+    
+    def _format_module_tree(module_tree: dict[str, any], indent: int = 0):
+        for key, value in module_tree.items():
+            if key == module_name:
+                lines.append(f"{'  ' * indent}{key} (current module)")
+            else:
+                lines.append(f"{'  ' * indent}{key}")
+            
+            lines.append(f"{'  ' * (indent + 1)} Core components: {', '.join(value['components'])}")
+            if ("children" in value) and isinstance(value["children"], dict) and len(value["children"]) > 0:
+                lines.append(f"{'  ' * (indent + 1)} Children:")
+                _format_module_tree(value["children"], indent + 2)
+    
+    _format_module_tree(module_tree, 0)
+    formatted_module_tree = "\n".join(lines)
+
+
+    if module_tree == {}:
+        return CLUSTER_REPO_PROMPT.format(potential_core_components=potential_core_components)
+    else:
+        return CLUSTER_MODULE_PROMPT.format(potential_core_components=potential_core_components, module_tree=formatted_module_tree, module_name=module_name)

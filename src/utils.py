@@ -1,15 +1,22 @@
-from dependency_analyzer import CodeComponent
 import re
 import mermaid as md
 from pathlib import Path
 from typing import List, Tuple
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import tiktoken
+import os
+import json
+from typing import Any, Optional, Dict
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def is_complex_module(components: dict[str, CodeComponent], core_component_ids: list[str]) -> bool:
+# ------------------------------------------------------------
+# ---------------------- Complexity Check --------------------
+# ------------------------------------------------------------
+
+def is_complex_module(components: dict[str, any], core_component_ids: list[str]) -> bool:
     files = set()
     for component_id in core_component_ids:
         if component_id in components:
@@ -19,6 +26,25 @@ def is_complex_module(components: dict[str, CodeComponent], core_component_ids: 
 
     return result
 
+
+# ------------------------------------------------------------
+# ---------------------- Token Counting ---------------------
+# ------------------------------------------------------------
+
+enc = tiktoken.encoding_for_model("gpt-4")
+
+def count_tokens(text: str) -> int:
+    """
+    Count the number of tokens in a text.
+    """
+    length = len(enc.encode(text))
+    logger.info(f"Number of tokens: {length}")
+    return length
+
+
+# ------------------------------------------------------------
+# ---------------------- Mermaid Validation -----------------
+# ------------------------------------------------------------
 
 def validate_mermaid_diagrams(md_file_path: str, relative_path: str) -> str:
     """
@@ -142,6 +168,48 @@ def validate_single_diagram(diagram_content: str, diagram_num: int, line_start: 
         
     except Exception as e:
         return f"  Diagram {diagram_num}: Exception during validation - {str(e)}"
+
+
+# ------------------------------------------------------------
+# ---------------------- File Manager ---------------------
+# ------------------------------------------------------------
+
+class FileManager:
+    """Handles file I/O operations."""
+    
+    @staticmethod
+    def ensure_directory(path: str) -> None:
+        """Create directory if it doesn't exist."""
+        os.makedirs(path, exist_ok=True)
+    
+    @staticmethod
+    def save_json(data: Any, filepath: str) -> None:
+        """Save data as JSON to file."""
+        with open(filepath, 'w') as f:
+            json.dump(data, f, indent=4)
+    
+    @staticmethod
+    def load_json(filepath: str) -> Optional[Dict[str, Any]]:
+        """Load JSON from file, return None if file doesn't exist."""
+        if not os.path.exists(filepath):
+            return None
+        
+        with open(filepath, 'r') as f:
+            return json.load(f)
+    
+    @staticmethod
+    def save_text(content: str, filepath: str) -> None:
+        """Save text content to file."""
+        with open(filepath, 'w') as f:
+            f.write(content)
+    
+    @staticmethod
+    def load_text(filepath: str) -> str:
+        """Load text content from file."""
+        with open(filepath, 'r') as f:
+            return f.read()
+
+file_manager = FileManager()
 
 
 if __name__ == "__main__":

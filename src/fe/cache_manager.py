@@ -11,6 +11,7 @@ from typing import Optional, Dict
 
 from .models import CacheEntry
 from .config import WebAppConfig
+from utils import file_manager
 
 
 class CacheManager:
@@ -28,16 +29,15 @@ class CacheManager:
         index_file = self.cache_dir / "cache_index.json"
         if index_file.exists():
             try:
-                with open(index_file, 'r') as f:
-                    data = json.load(f)
-                    for key, value in data.items():
-                        self.cache_index[key] = CacheEntry(
-                            repo_url=value['repo_url'],
-                            repo_url_hash=value['repo_url_hash'],
-                            docs_path=value['docs_path'],
-                            created_at=datetime.fromisoformat(value['created_at']),
-                            last_accessed=datetime.fromisoformat(value['last_accessed'])
-                        )
+                data = file_manager.load_json(index_file)
+                for key, value in data.items():
+                    self.cache_index[key] = CacheEntry(
+                        repo_url=value['repo_url'],
+                        repo_url_hash=value['repo_url_hash'],
+                        docs_path=value['docs_path'],
+                        created_at=datetime.fromisoformat(value['created_at']),
+                        last_accessed=datetime.fromisoformat(value['last_accessed'])
+                    )
             except Exception as e:
                 print(f"Error loading cache index: {e}")
     
@@ -55,8 +55,7 @@ class CacheManager:
                     'last_accessed': entry.last_accessed.isoformat()
                 }
             
-            with open(index_file, 'w') as f:
-                json.dump(data, f, indent=2)
+            file_manager.save_json(data, index_file)
         except Exception as e:
             print(f"Error saving cache index: {e}")
     

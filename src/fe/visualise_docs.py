@@ -24,6 +24,7 @@ from markdown_it import MarkdownIt
 
 from .template_utils import render_template
 from .templates import DOCS_VIEW_TEMPLATE
+from utils import file_manager
 
 app = FastAPI(title="Documentation Server", description="Simple documentation server for hosting markdown documentation folders")
 
@@ -59,8 +60,7 @@ def load_module_tree(docs_folder: Path) -> Optional[Dict]:
         return None
     
     try:
-        with open(tree_file, 'r', encoding='utf-8') as f:
-            return json.load(f)
+        return file_manager.load_json(tree_file)
     except Exception as e:
         print(f"Error loading module_tree.json: {e}")
         return None
@@ -94,10 +94,10 @@ def markdown_to_html(content: str) -> str:
 def get_file_title(file_path: Path) -> str:
     """Extract title from markdown file, fallback to filename."""
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            first_line = f.readline().strip()
-            if first_line.startswith('# '):
-                return first_line[2:].strip()
+        content = file_manager.load_text(file_path)
+        first_line = content.split('\n')[0].strip()
+        if first_line.startswith('# '):
+            return first_line[2:].strip()
     except Exception:
         pass
     
@@ -119,8 +119,7 @@ async def index():
         raise HTTPException(status_code=404, detail="overview.md not found in the documentation folder")
     
     try:
-        with open(overview_file, 'r', encoding='utf-8') as f:
-            content = f.read()
+        content = file_manager.load_text(overview_file)
         
         html_content = markdown_to_html(content)
         title = get_file_title(overview_file)
@@ -165,8 +164,7 @@ async def serve_doc(filename: str):
         raise HTTPException(status_code=404, detail=f"File {filename} not found")
     
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            content = f.read()
+        content = file_manager.load_text(file_path)
         
         html_content = markdown_to_html(content)
         title = get_file_title(file_path)

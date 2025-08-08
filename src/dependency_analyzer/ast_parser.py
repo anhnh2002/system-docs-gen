@@ -19,6 +19,7 @@ import re
 
 from .patterns import DEFAULT_IGNORE_PATTERNS
 from llm_services import call_llm
+from utils import file_manager
 
 logger = logging.getLogger(__name__)
 
@@ -339,7 +340,6 @@ class DependencyParser:
         # filter folders
         logger.info(f"Filtering folders ...")
         try:
-            raise Exception("test")
             filtered_folders = self.filter_folders()
             logger.info(f"Filtered folders: {filtered_folders}")
         except Exception as e:
@@ -390,8 +390,7 @@ class DependencyParser:
     def _parse_file(self, file_path: str, relative_path: str, module_path: str):
         """Parse a single Python file to collect code components."""
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                source = f.read()
+            source = file_manager.load_text(file_path)
             
             tree = ast.parse(source)
             
@@ -512,8 +511,7 @@ class DependencyParser:
             file_path = component.file_path
             
             try:
-                with open(file_path, "r", encoding="utf-8") as f:
-                    source = f.read()
+                source = file_manager.load_text(file_path)
                 
                 # Parse file to get imports
                 tree = ast.parse(source)
@@ -664,15 +662,13 @@ class DependencyParser:
         # Create directories if they don't exist
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         
-        with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(serializable_components, f, indent=2)
+        file_manager.save_json(serializable_components, output_path)
         
         logger.info(f"Saved dependency graph to {output_path}")
     
     def load_dependency_graph(self, input_path: str):
         """Load the dependency graph from a JSON file."""
-        with open(input_path, "r", encoding="utf-8") as f:
-            serialized_components = json.load(f)
+        serialized_components = file_manager.load_json(input_path)
         
         # Convert back to CodeComponent objects
         self.components = {

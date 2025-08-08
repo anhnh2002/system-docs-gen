@@ -20,7 +20,7 @@ from .models import JobStatus
 from .cache_manager import CacheManager
 from .github_processor import GitHubRepoProcessor
 from .config import WebAppConfig
-
+from utils import file_manager
 
 class BackgroundWorker:
     """Background worker for processing documentation generation jobs."""
@@ -67,8 +67,7 @@ class BackgroundWorker:
             return
         
         try:
-            with open(self.jobs_file, 'r') as f:
-                data = json.load(f)
+            data = file_manager.load_json(self.jobs_file)
                 
             for job_id, job_data in data.items():
                 # Only load completed jobs to avoid inconsistent state
@@ -143,8 +142,7 @@ class BackgroundWorker:
                     'docs_path': job.docs_path
                 }
             
-            with open(self.jobs_file, 'w') as f:
-                json.dump(data, f, indent=2)
+            file_manager.save_json(data, self.jobs_file)
         except Exception as e:
             print(f"Error saving job statuses: {e}")
     

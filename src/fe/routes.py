@@ -21,6 +21,7 @@ from .cache_manager import CacheManager
 from .templates import WEB_INTERFACE_TEMPLATE
 from .template_utils import render_template
 from .config import WebAppConfig
+from utils import file_manager
 
 
 class WebRoutes:
@@ -219,8 +220,7 @@ class WebRoutes:
         module_tree_file = docs_path / "module_tree.json"
         if module_tree_file.exists():
             try:
-                with open(module_tree_file, 'r') as f:
-                    module_tree = json.load(f)
+                module_tree = file_manager.load_json(module_tree_file)
             except Exception:
                 pass
         
@@ -230,8 +230,7 @@ class WebRoutes:
             raise HTTPException(status_code=404, detail=f"File {filename} not found")
         
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                content = f.read()
+            content = file_manager.load_text(file_path)
             
             # Convert markdown to HTML (reuse from visualise_docs.py)
             from .visualise_docs import markdown_to_html, get_file_title

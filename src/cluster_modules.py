@@ -3,57 +3,73 @@ from collections import defaultdict
 
 from dependency_analyzer.ast_parser import CodeComponent
 from llm_services import call_llm
+from utils import count_tokens
+from config import MAX_TOKEN_PER_MODULE
+from prompt_template import format_cluster_prompt
 
-PROMPT = """
-After statically analyzing the repository, here is list of all root components (there is no other components depend on them and it's normal that some root components are not essential to the repository):
-<root_components>
-{root_components}
-</root_components>
 
-Please group the components into groups such that each group is a set of components that are closely related to each other and together they form a module. DO NOT include components that are not essential to the repository.
-Firstly reason about the components and then group them and return the result in the following format:
-<grouped_components>
-{{
-    "module_name_1": {{
-        "path": <path_to_the_module>, # the path to the module can be file or directory
-        "components": [
-            <component_name_1>,
-            <component_name_2>,
-            ...
-        ]
-    }},
-    "module_name_2": {{
-        "path": <path_to_the_module>,
-        "components": [
-            <component_name_1>,
-            <component_name_2>,
-            ...
-        ]
-    }},
-    ...
-}}
-</grouped_components>
-""".strip()
-
-def cluster_modules(leaf_nodes: List[str], components: Dict[str, CodeComponent]) -> Dict[str, Any]:
+def format_potential_core_components(leaf_nodes: List[str], components: Dict[str, CodeComponent]) -> tuple[str, str]:
     """
-    Cluster the root components into modules.
+    Format the potential core components into a string that can be used in the prompt.
     """
     #group leaf nodes by file
     leaf_nodes_by_file = defaultdict(list)
     for leaf_node in leaf_nodes:
         leaf_nodes_by_file[components[leaf_node].relative_path].append(leaf_node)
 
-    root_components = ""
+    potential_core_components = ""
+    potential_core_components_with_code = ""
     for file, leaf_nodes in dict(sorted(leaf_nodes_by_file.items())).items():
-        root_components += f"# {file}\n"
+        potential_core_components += f"# {file}\n"
+        potential_core_components_with_code += f"# {file}\n"
         for leaf_node in leaf_nodes:
-            root_components += f"\t{leaf_node}\n"
+            potential_core_components += f"\t{leaf_node}\n"
+            potential_core_components_with_code += f"\t{leaf_node}\n"
+            potential_core_components_with_code += f"{components[leaf_node].source_code}\n"
 
-    prompt = PROMPT.format(root_components=root_components)
+    return potential_core_components, potential_core_components_with_code
+
+
+def cluster_modules(
+    leaf_nodes: List[str],
+    components: Dict[str, CodeComponent],
+    current_module_tree: dict[str, Any] = {},
+    current_module_name: str = None,
+    current_module_path: List[str] = []
+) -> Dict[str, Any]:
+    """
+    Cluster the potential core components into modules.
+    """
+    potential_core_components, potential_core_components_with_code = format_potential_core_components(leaf_nodes, components)
+
+    if count_tokens(potential_core_components_with_code) <= MAX_TOKEN_PER_MODULE:
+        return {}
+
+    prompt = format_cluster_prompt(potential_core_components, current_module_tree, current_module_name)
     response = call_llm(prompt, model="claude-sonnet-4")
 
     #parse the response
-    response = eval(response.split("<grouped_components>")[1].split("</grouped_components>")[0])
+    module_tree = eval(response.split("<GROUPED_COMPONENTS>")[1].split("</GROUPED_COMPONENTS>")[0])
 
-    return response
+    # check if the module tree is valid
+    if len(module_tree) <= 1:
+        return {}
+
+    if current_module_tree == {}:
+        current_module_tree = module_tree
+    else:
+        value = current_module_tree
+        for key in current_module_path:
+            value = value[key]["children"]
+        for module_name, module_info in module_tree.items():
+            del module_info["path"]
+            value[module_name] = module_info
+
+    for module_name, module_info in module_tree.items():
+        sub_leaf_nodes = module_info["components"]
+        current_module_path.append(module_name)
+        module_info["children"] = {}
+        module_info["children"] = cluster_modules(sub_leaf_nodes, components, current_module_tree, module_name, current_module_path)
+        current_module_path.pop()
+
+    return module_tree
